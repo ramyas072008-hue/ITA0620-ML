@@ -1,0 +1,100 @@
+# Decision Tree using ID3 Algorithm
+
+import math
+import pandas as pd
+from collections import Counter
+from pprint import pprint
+
+data = {
+    'Outlook': ['Sunny', 'Sunny', 'Overcast', 'Rain',
+                'Rain', 'Rain', 'Overcast', 'Sunny',
+                'Sunny', 'Rain', 'Sunny', 'Overcast',
+                'Overcast', 'Rain'],
+    'Temperature': ['Hot', 'Hot', 'Hot', 'Mild',
+                    'Cool', 'Cool', 'Cool', 'Mild',
+                    'Cool', 'Mild', 'Mild', 'Mild',
+                    'Hot', 'Mild'],
+    'Humidity': ['High', 'High', 'High', 'High',
+                 'Normal', 'Normal', 'Normal', 'High',
+                 'Normal', 'Normal', 'Normal', 'High',
+                 'Normal', 'High'],
+    'Wind': ['Weak', 'Strong', 'Weak', 'Weak',
+             'Weak', 'Strong', 'Strong', 'Weak',
+             'Weak', 'Weak', 'Strong', 'Strong',
+             'Weak', 'Strong'],
+    'Play': ['No', 'No', 'Yes', 'Yes',
+             'Yes', 'No', 'Yes', 'No',
+             'Yes', 'Yes', 'Yes', 'Yes',
+             'Yes', 'No']
+}
+
+df = pd.DataFrame(data)
+
+def entropy(labels):
+    counts = Counter(labels)
+    total = len(labels)
+    return -sum(
+        (count / total) * math.log2(count / total)
+        for count in counts.values()
+    )
+
+def id3(df, target):
+    if len(df[target].unique()) == 1:
+        return df[target].iloc[0]
+
+    features = [c for c in df.columns if c != target]
+
+    if not features:
+        return df[target].mode()[0]
+
+    base_entropy = entropy(df[target])
+    best_feature = max(
+        features,
+        key=lambda feature: base_entropy - sum(
+            len(group) / len(df) * entropy(group[target])
+            for _, group in df.groupby(feature)
+        )
+    )
+
+    tree = {best_feature: {}}
+
+    for value, group in df.groupby(best_feature):
+        subtree_df = group.drop(columns=[best_feature])
+        tree[best_feature][value] = id3(subtree_df, target)
+
+    return tree
+
+def predict(tree, sample):
+    if not isinstance(tree, dict):
+        return tree
+
+    feature = next(iter(tree))
+    value = sample.get(feature)
+
+    if value not in tree[feature]:
+        return "Unknown"
+
+    return predict(tree[feature][value], sample)
+
+tree = id3(df, 'Play')
+
+print("Decision Tree:")
+pprint(tree)
+
+sample = {
+    'Outlook': 'Sunny',
+    'Temperature': 'Cool',
+    'Humidity': 'Normal',
+    'Wind': 'Strong'
+}
+
+print("New Sample:", sample)
+print("Prediction:", predict(tree, sample))
+
+output:
+Decision Tree:
+{'Outlook': {'Overcast': 'Yes',
+             'Rain': {'Wind': {'Strong': 'No', 'Weak': 'Yes'}},
+             'Sunny': {'Humidity': {'High': 'No', 'Normal': 'Yes'}}}}
+New Sample: {'Outlook': 'Sunny', 'Temperature': 'Cool', 'Humidity': 'Normal', 'Wind': 'Strong'}
+Prediction: Yes
